@@ -2,6 +2,7 @@ package constraint
 
 import (
 	"fmt"
+	"sync"
 )
 
 // TODO @gbotrel this shouldn't be there, but we need to figure out a clean way to serialize
@@ -11,28 +12,51 @@ import (
 // It is essentially a hint to the solver, but enables storing the table entries only once.
 type BlueprintLookupHint struct {
 	EntriesCalldata []uint32
+	// IsStatic indicates if the lookup table does not grow after first lookup
+	IsStatic       bool
+	staticIsWalked bool
+	entries        []Element
+
+	onceEntries sync.Once
 }
 
 // ensures BlueprintLookupHint implements the BlueprintSolvable interface
 var _ BlueprintSolvable = (*BlueprintLookupHint)(nil)
 
-func (b *BlueprintLookupHint) Solve(s Solver, inst Instruction) error {
-	nbEntries := int(inst.Calldata[1])
-	entries := make([]Element, nbEntries)
+func (b *BlueprintLookupHint) getTable(nbEntries int, s Solver) []Element {
+	if !b.IsStatic {
+		return b.readTable(nbEntries, s)
+	} else {
+		b.onceEntries.Do(func() {
+			b.entries = b.readTable(nbEntries, s)
+		})
+		return b.entries
+	}
+}
 
+func (b *BlueprintLookupHint) readTable(nbEntries int, s Solver) []Element {
 	// read the static entries from the blueprint
-	// TODO @gbotrel cache that.
+	entries := make([]Element, nbEntries)
 	offset, delta := 0, 0
 	for i := 0; i < nbEntries; i++ {
 		entries[i], delta = s.Read(b.EntriesCalldata[offset:])
 		offset += delta
 	}
+	return entries
+}
 
+func (b *BlueprintLookupHint) Solve(s Solver, inst Instruction) error {
+	nbEntries := int(inst.Calldata[1])
+	if b.IsStatic && len(b.entries) > 0 && len(b.entries) != nbEntries {
+		return fmt.Errorf("lookup blueprint is marked static but table grew")
+	}
+	entries := b.getTable(nbEntries, s)
 	nbInputs := int(inst.Calldata[2])
 
 	// read the inputs from the instruction
 	inputs := make([]Element, nbInputs)
-	offset = 3
+	offset := 3
+	delta := 0
 	for i := 0; i < nbInputs; i++ {
 		inputs[i], delta = s.Read(inst.Calldata[offset:])
 		offset += delta
@@ -56,6 +80,7 @@ func (b *BlueprintLookupHint) CalldataSize() int {
 	// variable size
 	return -1
 }
+
 func (b *BlueprintLookupHint) NbConstraints() int {
 	return 0
 }
@@ -69,27 +94,31 @@ func (b *BlueprintLookupHint) NbOutputs(inst Instruction) int {
 // This is used by the level builder to build a dependency graph between instructions.
 func (b *BlueprintLookupHint) WireWalker(inst Instruction) func(cb func(wire uint32)) {
 	return func(cb func(wire uint32)) {
-		// depend on the table UP to the number of entries at time of instruction creation.
-		nbEntries := int(inst.Calldata[1])
-
-		// invoke the callback on each wire appearing in the table
-		j := 0
-		for i := 0; i < nbEntries; i++ {
-			// first we have the length of the linear expression
-			n := int(b.EntriesCalldata[j])
-			j++
-			for k := 0; k < n; k++ {
-				t := Term{CID: b.EntriesCalldata[j], VID: b.EntriesCalldata[j+1]}
-				if !t.IsConstant() {
-					cb(t.VID)
+		if !b.IsStatic || (b.IsStatic && !b.staticIsWalked) {
+			// depend on the table UP to the number of entries at time of instruction creation.
+			nbEntries := int(inst.Calldata[1])
+			// invoke the callback on each wire appearing in the table
+			j := 0
+			for i := 0; i < nbEntries; i++ {
+				// first we have the length of the linear expression
+				n := int(b.EntriesCalldata[j])
+				j++
+				for k := 0; k < n; k++ {
+					t := Term{CID: b.EntriesCalldata[j], VID: b.EntriesCalldata[j+1]}
+					if !t.IsConstant() {
+						cb(t.VID)
+					}
+					j += 2
 				}
-				j += 2
+				if b.IsStatic {
+					b.staticIsWalked = true
+				}
 			}
 		}
 
 		// invoke the callback on each wire appearing in the inputs
 		nbInputs := int(inst.Calldata[2])
-		j = 3
+		j := 3
 		for i := 0; i < nbInputs; i++ {
 			// first we have the length of the linear expression
 			n := int(inst.Calldata[j])
@@ -102,7 +131,6 @@ func (b *BlueprintLookupHint) WireWalker(inst Instruction) func(cb func(wire uin
 				j += 2
 			}
 		}
-
 		// finally we have the outputs
 		for i := 0; i < nbInputs; i++ {
 			cb(uint32(i + int(inst.WireOffset)))

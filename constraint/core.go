@@ -50,7 +50,6 @@ type PackedInstruction struct {
 
 // Unpack returns the instruction corresponding to the packed instruction.
 func (pi PackedInstruction) Unpack(cs *System) Instruction {
-
 	blueprint := cs.Blueprints[pi.BlueprintID]
 	cSize := blueprint.CalldataSize()
 	if cSize < 0 {
@@ -172,9 +171,11 @@ func (system *System) AddBlueprint(b Blueprint) BlueprintID {
 func (system *System) GetNbSecretVariables() int {
 	return len(system.Secret)
 }
+
 func (system *System) GetNbPublicVariables() int {
 	return len(system.Public)
 }
+
 func (system *System) GetNbInternalVariables() int {
 	return system.NbInternalVariables
 }

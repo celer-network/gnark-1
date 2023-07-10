@@ -5,6 +5,7 @@ package groth16
 // But some gas cost optimizations have been made.
 // this is an experimental feature and gnark solidity generator as not been thoroughly tested
 const solidityTemplate = `
+{{- $lenCommits := len .PublicAndCommitmentCommitted }}
 {{- $lenK := len .G1.K }}
 // SPDX-License-Identifier: AML
 //
@@ -28,6 +29,8 @@ const solidityTemplate = `
 // 2019 OKIMS
 
 pragma solidity ^0.8.0;
+
+import "hardhat/console.sol";
 
 library Pairing {
 
@@ -197,13 +200,16 @@ contract Verifier {
         Pairing.G2Point beta2;
         Pairing.G2Point gamma2;
         Pairing.G2Point delta2;
+        
         // []G1Point IC (K in gnark) appears directly in verifyProof
+        
     }
 
     struct Proof {
         Pairing.G1Point A;
         Pairing.G2Point B;
         Pairing.G1Point C;
+        Pairing.G1Point[{{len .PublicAndCommitmentCommitted}}] Commitments;
     }
 
     function verifyingKey() internal pure returns (VerifyingKey memory vk) {
@@ -243,13 +249,24 @@ contract Verifier {
         uint256[2] memory a,
         uint256[2][2] memory b,
         uint256[2] memory c,
+        {{- if (gt $lenCommits 0) }}
+        uint256[2][{{len .PublicAndCommitmentCommitted}}] calldata commitments,
         uint256[{{sub $lenK 1}}] calldata input
+        {{- else }}
+        uint256[{{sub $lenK 1}}] calldata input
+        {{- end }}
     ) public view returns (bool r) {
 
         Proof memory proof;
         proof.A = Pairing.G1Point(a[0], a[1]);
         proof.B = Pairing.G2Point([b[0][0], b[0][1]], [b[1][0], b[1][1]]);
         proof.C = Pairing.G1Point(c[0], c[1]);
+        for (uint256 i = 0; i < commitments.length; i++) {
+            proof.Commitments[i] = Pairing.G1Point(
+                commitments[i][0],
+                commitments[i][1]
+            );
+        }
 
         // Make sure that proof.A, B, and C are each less than the prime q
         require(proof.A.X < PRIME_Q, "verifier-aX-gte-prime-q");
@@ -290,7 +307,7 @@ contract Verifier {
         vk_x.X = uint256({{$k0.X.String}}); // vk.K[0].X
         vk_x.Y = uint256({{$k0.Y.String}}); // vk.K[0].Y
 
-        {{- if eq (len .G1.K) 1}}
+        {{- if eq $lenK 1}}
             // no public input, vk_x == vk.K[0]
         {{- end}}
         {{- range $i, $ki := .G1.K }}
@@ -300,8 +317,12 @@ contract Verifier {
         mul_input[1] = uint256({{$ki.Y.String}}); // vk.K[{{$i}}].Y
         mul_input[2] = input[{{$j}}];
         accumulate(mul_input, q, add_input, vk_x); // vk_x += vk.K[{{$i}}] * input[{{$j}}]
-            {{- end -}}
+            {{- end }}
         {{- end }}
+
+        for (uint256 i = 0; i < proof.Commitments.length; i++) {
+            vk_x = Pairing.plus(vk_x, proof.Commitments[i]);
+        }
 
         return Pairing.pairing(
             Pairing.negate(proof.A),

@@ -47,7 +47,7 @@ type result struct {
 // New returns a new [*Table]. It additionally defers building the
 // log-derivative argument.
 func New(api frontend.API) *Table {
-	t := &Table{api: api}
+	t := &Table{api: api, blueprint: constraint.BlueprintLookupHint{IsStatic: true}}
 	api.Compiler().Defer(t.commit)
 
 	// each table has a unique blueprint
