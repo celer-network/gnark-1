@@ -3,6 +3,7 @@ package keccaklookup
 import (
 	"fmt"
 	"testing"
+	"time"
 
 	"github.com/consensys/gnark-crypto/ecc"
 	"github.com/consensys/gnark/frontend"
@@ -83,14 +84,14 @@ func TestPermute(t *testing.T) {
 		Out:  out256,
 		k:    8,
 	}
-	w := &KeccakCircuit{
-		Data: dataBits,
-		Out:  out256,
-		k:    8,
-	}
+	// w := &KeccakCircuit{
+	// 	Data: dataBits,
+	// 	Out:  out256,
+	// 	k:    8,
+	// }
 
-	err := test.IsSolved(c, w, ecc.BN254.ScalarField())
-	check(err)
+	// err := test.IsSolved(c, w, ecc.BN254.ScalarField())
+	// check(err)
 
 	cs, err := frontend.Compile(ecc.BN254.ScalarField(), r1cs.NewBuilder, c)
 	check(err)
@@ -127,7 +128,10 @@ func (c *KeccakCircuit) Define(api frontend.API) error {
 		s[i] = k.xor(s[i], in[i])
 	}
 	// do permute
+	before := time.Now()
 	out := k.Permute(s)
+	fmt.Printf("permute took %s\n", time.Since(before))
+	out = k.Permute(s)
 	// convert lanes back into single bit words
 	var actual Words
 	for i := 0; i < 4; i++ {

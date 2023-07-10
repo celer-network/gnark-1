@@ -2,6 +2,7 @@ package constraint
 
 import (
 	"fmt"
+	"time"
 )
 
 // TODO @gbotrel this shouldn't be there, but we need to figure out a clean way to serialize
@@ -17,7 +18,12 @@ type BlueprintLookupHint struct {
 // ensures BlueprintLookupHint implements the BlueprintSolvable interface
 var _ BlueprintSolvable = (*BlueprintLookupHint)(nil)
 
+func Time(t time.Time, s string) {
+	fmt.Printf("%s took %s\n", s, time.Since(t))
+}
+
 func (b *BlueprintLookupHint) Solve(s Solver, inst Instruction) error {
+	time1 := time.Now()
 	nbEntries := int(inst.Calldata[1])
 	if len(b.entries) == 0 {
 		// read the static entries from the blueprint
@@ -28,10 +34,11 @@ func (b *BlueprintLookupHint) Solve(s Solver, inst Instruction) error {
 			offset += delta
 		}
 	}
-
+	Time(time1, "entries table")
 	nbInputs := int(inst.Calldata[2])
 
 	// read the inputs from the instruction
+	time2 := time.Now()
 	inputs := make([]Element, nbInputs)
 	offset := 3
 	delta := 0
@@ -39,8 +46,10 @@ func (b *BlueprintLookupHint) Solve(s Solver, inst Instruction) error {
 		inputs[i], delta = s.Read(inst.Calldata[offset:])
 		offset += delta
 	}
+	Time(time2, "read inputs")
 
 	// set the outputs
+	time3 := time.Now()
 	nbOutputs := nbInputs
 
 	for i := 0; i < nbOutputs; i++ {
@@ -51,6 +60,7 @@ func (b *BlueprintLookupHint) Solve(s Solver, inst Instruction) error {
 		// we set the output wire to the value of the entry
 		s.SetValue(uint32(i+int(inst.WireOffset)), b.entries[idx])
 	}
+	Time(time3, "set outputs")
 	return nil
 }
 

@@ -66,14 +66,6 @@ func NewKeccakfAPI(api frontend.API, k int) *KeccakfAPI {
 	}
 }
 
-func print(i int, st [25]Words) {
-	fmt.Printf("%d ", i)
-	for _, s := range st {
-		fmt.Printf("%s", s)
-	}
-	fmt.Printf("\n")
-}
-
 func (ka *KeccakfAPI) Permute(st [25]Words) [25]Words {
 	var bc [5]Words
 	var t Words
@@ -129,9 +121,7 @@ func (k *KeccakfAPI) chi(a, b, c Words) Words {
 		// Note: for now if the size of the word a, b, and c are not equal to k, the lookup would
 		// give wrong result. TODO: check and pad a, b, c to correct size before lookup.
 		merged := k.wa.merge(Words{a[i], b[i], c[i]})
-		t := time.Now()
 		res := k.chiTable.Lookup(merged.Val)
-		fmt.Println("chi lookup took", time.Since(t))
 		ret = append(ret, Word{Val: res[0], Size: a[i].Size})
 	}
 	return ret
@@ -158,9 +148,7 @@ func (k *KeccakfAPI) xor2(a, b Words) Words {
 			panic(fmt.Sprintf("cannot xor: a[%d].size (%d) != b[%d].size (%d)", i, a[i].Size, i, b[i].Size))
 		}
 		merged := k.wa.merge(Words{a[i], b[i]})
-		t := time.Now()
 		xored := k.xorTable.Lookup(merged.Val)
-		fmt.Println("xor lookup took", time.Since(t))
 		ret = append(ret, Word{Val: xored[0], Size: a[i].Size})
 	}
 	return ret
