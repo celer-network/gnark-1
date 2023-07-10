@@ -11,6 +11,7 @@ import (
 // It is essentially a hint to the solver, but enables storing the table entries only once.
 type BlueprintLookupHint struct {
 	EntriesCalldata []uint32
+	entries         []Element
 }
 
 // ensures BlueprintLookupHint implements the BlueprintSolvable interface
@@ -18,21 +19,22 @@ var _ BlueprintSolvable = (*BlueprintLookupHint)(nil)
 
 func (b *BlueprintLookupHint) Solve(s Solver, inst Instruction) error {
 	nbEntries := int(inst.Calldata[1])
-	entries := make([]Element, nbEntries)
-
-	// read the static entries from the blueprint
-	// TODO @gbotrel cache that.
-	offset, delta := 0, 0
-	for i := 0; i < nbEntries; i++ {
-		entries[i], delta = s.Read(b.EntriesCalldata[offset:])
-		offset += delta
+	if len(b.entries) == 0 {
+		// read the static entries from the blueprint
+		b.entries = make([]Element, nbEntries)
+		offset, delta := 0, 0
+		for i := 0; i < nbEntries; i++ {
+			b.entries[i], delta = s.Read(b.EntriesCalldata[offset:])
+			offset += delta
+		}
 	}
 
 	nbInputs := int(inst.Calldata[2])
 
 	// read the inputs from the instruction
 	inputs := make([]Element, nbInputs)
-	offset = 3
+	offset := 3
+	delta := 0
 	for i := 0; i < nbInputs; i++ {
 		inputs[i], delta = s.Read(inst.Calldata[offset:])
 		offset += delta
@@ -43,11 +45,11 @@ func (b *BlueprintLookupHint) Solve(s Solver, inst Instruction) error {
 
 	for i := 0; i < nbOutputs; i++ {
 		idx, isUint64 := s.Uint64(inputs[i])
-		if !isUint64 || idx >= uint64(len(entries)) {
+		if !isUint64 || idx >= uint64(len(b.entries)) {
 			return fmt.Errorf("lookup query too large")
 		}
 		// we set the output wire to the value of the entry
-		s.SetValue(uint32(i+int(inst.WireOffset)), entries[idx])
+		s.SetValue(uint32(i+int(inst.WireOffset)), b.entries[idx])
 	}
 	return nil
 }
@@ -56,6 +58,7 @@ func (b *BlueprintLookupHint) CalldataSize() int {
 	// variable size
 	return -1
 }
+
 func (b *BlueprintLookupHint) NbConstraints() int {
 	return 0
 }
