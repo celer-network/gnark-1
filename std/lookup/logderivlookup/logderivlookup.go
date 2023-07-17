@@ -19,9 +19,6 @@
 package logderivlookup
 
 import (
-	"fmt"
-	"time"
-
 	"github.com/consensys/gnark/constraint"
 	"github.com/consensys/gnark/frontend"
 	"github.com/consensys/gnark/std/internal/logderivarg"
@@ -50,7 +47,7 @@ type result struct {
 // New returns a new [*Table]. It additionally defers building the
 // log-derivative argument.
 func New(api frontend.API) *Table {
-	t := &Table{api: api}
+	t := &Table{api: api, blueprint: constraint.BlueprintLookupHint{IsStatic: true}}
 	api.Compiler().Defer(t.commit)
 
 	// each table has a unique blueprint
@@ -90,10 +87,6 @@ func (t *Table) Lookup(inds ...frontend.Variable) (vals []frontend.Variable) {
 	return t.performLookup(inds)
 }
 
-func logTime(t time.Time, s string) {
-	fmt.Printf("%s took %s\n", s, time.Since(t))
-}
-
 // performLookup performs the lookup and returns the resulting variables.
 // underneath, it does use the blueprint to encode the lookup hint.
 func (t *Table) performLookup(inds []frontend.Variable) []frontend.Variable {
@@ -108,21 +101,17 @@ func (t *Table) performLookup(inds []frontend.Variable) []frontend.Variable {
 	calldata[2] = uint32(len(inds))
 
 	// encode inputs
-	time1 := time.Now()
 	for _, in := range inds {
 		v := compiler.ToCanonicalVariable(in)
 		v.Compress(&calldata)
 	}
-	logTime(time1, "encode inputs")
 
 	// by convention, first calldata is len of inputs
 	calldata[0] = uint32(len(calldata))
 
 	// now what we are left to do is add an instruction to the constraint system
 	// such that at solving time the blueprint can properly execute the lookup logic.
-	time2 := time.Now()
 	outputs := compiler.AddInstruction(t.bID, calldata)
-	logTime(time2, "add instruction")
 
 	// sanity check
 	if len(outputs) != len(inds) {
@@ -134,13 +123,11 @@ func (t *Table) performLookup(inds []frontend.Variable) []frontend.Variable {
 	lookupResult := make([]result, len(inds))
 
 	// we need to store the result of the lookup in the table
-	time3 := time.Now()
 	for i := range inds {
 		internalVariables[i] = compiler.InternalVariable(outputs[i])
 		lookupResult[i] = result{ind: inds[i], val: internalVariables[i]}
 	}
 	t.results = append(t.results, lookupResult...)
-	logTime(time3, "store results")
 	return internalVariables
 }
 

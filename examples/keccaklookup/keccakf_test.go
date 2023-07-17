@@ -93,7 +93,7 @@ func TestPermute(t *testing.T) {
 	// err := test.IsSolved(c, w, ecc.BN254.ScalarField())
 	// check(err)
 
-	cs, err := frontend.Compile(ecc.BN254.ScalarField(), r1cs.NewBuilder, c)
+	cs, err := frontend.Compile(ecc.BN254.ScalarField(), r1cs.NewBuilder, c, frontend.WithCapacity(1<<24))
 	check(err)
 	fmt.Println("constraints", cs.GetNbConstraints())
 }
