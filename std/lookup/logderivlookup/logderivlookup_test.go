@@ -9,6 +9,7 @@ import (
 	"testing"
 
 	"github.com/consensys/gnark-crypto/ecc"
+	fr_bn254 "github.com/consensys/gnark-crypto/ecc/bn254/fr"
 	"github.com/consensys/gnark/backend"
 	"github.com/consensys/gnark/backend/groth16"
 	"github.com/consensys/gnark/frontend"
@@ -76,16 +77,13 @@ func TestLookup(t *testing.T) {
 
 func TestSolidityExport(t *testing.T) {
 	assert := test.NewAssert(t)
-	field := ecc.BN254.ScalarField()
 	witness := LookupCircuit{PubDummy: 0}
-	bound := big.NewInt(int64(len(witness.Entries)))
 	for i := range witness.Entries {
-		witness.Entries[i], _ = rand.Int(rand.Reader, field)
+		witness.Entries[i] = i
 	}
 	for i := range witness.Queries {
-		q, _ := rand.Int(rand.Reader, bound)
-		witness.Queries[i] = q
-		witness.Expected[i] = new(big.Int).Set(witness.Entries[q.Int64()].(*big.Int))
+		witness.Queries[i] = i
+		witness.Expected[i] = i
 	}
 
 	ccs, err := frontend.Compile(ecc.BN254.ScalarField(), r1cs.NewBuilder, &LookupCircuit{PubDummy: 0})
@@ -95,9 +93,6 @@ func TestSolidityExport(t *testing.T) {
 	assert.NoError(err)
 	publicWitness, err := w.Public()
 	assert.NoError(err)
-	pub, err := publicWitness.MarshalBinary()
-	assert.NoError(err)
-	fmt.Printf("public %x\n", pub)
 	pk, vk, err := groth16.Setup(ccs)
 	assert.NoError(err)
 	proof, err := groth16.Prove(ccs, pk, w)
@@ -105,13 +100,18 @@ func TestSolidityExport(t *testing.T) {
 
 	a, b, c, commitments, commitmentPok := ExportProof(proof)
 	fmt.Println("a:", a, "b:", b, "c:", c, "commit:", commitments, "pok:", commitmentPok)
+	wvec, ok := publicWitness.Vector().(fr_bn254.Vector)
+	if !ok {
+		panic("publicWitness.Vector")
+	}
+	fmt.Println("wvec", wvec)
 
 	err = groth16.Verify(proof, vk, publicWitness)
 	assert.NoError(err)
 
 	fmt.Println("groth16 verify finished")
 
-	f, err := os.Create("LookUpTest1.sol")
+	f, err := os.Create("LookUpTest.sol")
 	if err != nil {
 		assert.NoError(err)
 	}
