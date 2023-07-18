@@ -84,16 +84,16 @@ func TestPermute(t *testing.T) {
 		Out:  out256,
 		k:    8,
 	}
-	// w := &KeccakCircuit{
-	// 	Data: dataBits,
-	// 	Out:  out256,
-	// 	k:    8,
-	// }
+	w := &KeccakCircuit{
+		Data: dataBits,
+		Out:  out256,
+		k:    8,
+	}
 
-	// err := test.IsSolved(c, w, ecc.BN254.ScalarField())
-	// check(err)
+	err := test.IsSolved(c, w, ecc.BN254.ScalarField())
+	check(err)
 
-	cs, err := frontend.Compile(ecc.BN254.ScalarField(), r1cs.NewBuilder, c, frontend.WithCapacity(1<<24))
+	cs, err := frontend.Compile(ecc.BN254.ScalarField(), r1cs.NewBuilder, c)
 	check(err)
 	fmt.Println("constraints", cs.GetNbConstraints())
 }

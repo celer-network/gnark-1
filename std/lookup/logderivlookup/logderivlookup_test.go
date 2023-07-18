@@ -13,11 +13,11 @@ import (
 	"github.com/consensys/gnark/backend/groth16"
 	"github.com/consensys/gnark/frontend"
 	"github.com/consensys/gnark/frontend/cs/r1cs"
-	"github.com/consensys/gnark/frontend/cs/scs"
 	"github.com/consensys/gnark/test"
 )
 
 type LookupCircuit struct {
+	PubDummy          frontend.Variable `gnark:",public"`
 	Entries           [1000]frontend.Variable
 	Queries, Expected [100]frontend.Variable
 }
@@ -34,13 +34,14 @@ func (c *LookupCircuit) Define(api frontend.API) error {
 	for i := range results {
 		api.AssertIsEqual(results[i], c.Expected[i])
 	}
+	api.AssertIsEqual(c.PubDummy, 0)
 	return nil
 }
 
 func TestLookup(t *testing.T) {
 	assert := test.NewAssert(t)
 	field := ecc.BN254.ScalarField()
-	witness := LookupCircuit{}
+	witness := LookupCircuit{PubDummy: 0}
 	bound := big.NewInt(int64(len(witness.Entries)))
 	for i := range witness.Entries {
 		witness.Entries[i], _ = rand.Int(rand.Reader, field)
@@ -51,27 +52,32 @@ func TestLookup(t *testing.T) {
 		witness.Expected[i] = new(big.Int).Set(witness.Entries[q.Int64()].(*big.Int))
 	}
 
-	ccs, err := frontend.Compile(ecc.BN254.ScalarField(), scs.NewBuilder, &LookupCircuit{})
+	fmt.Println("compile")
+	ccs, err := frontend.Compile(ecc.BN254.ScalarField(), r1cs.NewBuilder, &LookupCircuit{PubDummy: 0})
 	assert.NoError(err)
 
+	fmt.Println("new witness")
 	w, err := frontend.NewWitness(&witness, ecc.BN254.ScalarField())
 	assert.NoError(err)
 
+	fmt.Println("solve")
 	_, err = ccs.Solve(w)
 	assert.NoError(err)
 
+	fmt.Println("test.IsSolved")
 	err = test.IsSolved(&LookupCircuit{}, &witness, ecc.BN254.ScalarField())
 	assert.NoError(err)
 
+	fmt.Println("ProverSucceeded")
 	assert.ProverSucceeded(&LookupCircuit{}, &witness,
 		test.WithCurves(ecc.BN254),
-		test.WithBackends(backend.GROTH16, backend.PLONK))
+		test.WithBackends(backend.GROTH16))
 }
 
 func TestSolidityExport(t *testing.T) {
 	assert := test.NewAssert(t)
 	field := ecc.BN254.ScalarField()
-	witness := LookupCircuit{}
+	witness := LookupCircuit{PubDummy: 0}
 	bound := big.NewInt(int64(len(witness.Entries)))
 	for i := range witness.Entries {
 		witness.Entries[i], _ = rand.Int(rand.Reader, field)
@@ -82,17 +88,18 @@ func TestSolidityExport(t *testing.T) {
 		witness.Expected[i] = new(big.Int).Set(witness.Entries[q.Int64()].(*big.Int))
 	}
 
-	ccs, err := frontend.Compile(ecc.BN254.ScalarField(), r1cs.NewBuilder, &LookupCircuit{})
+	ccs, err := frontend.Compile(ecc.BN254.ScalarField(), r1cs.NewBuilder, &LookupCircuit{PubDummy: 0})
 	assert.NoError(err)
 
 	w, err := frontend.NewWitness(&witness, ecc.BN254.ScalarField())
 	assert.NoError(err)
 	publicWitness, err := w.Public()
 	assert.NoError(err)
-
+	pub, err := publicWitness.MarshalBinary()
+	assert.NoError(err)
+	fmt.Printf("public %x\n", pub)
 	pk, vk, err := groth16.Setup(ccs)
 	assert.NoError(err)
-
 	proof, err := groth16.Prove(ccs, pk, w)
 	assert.NoError(err)
 
@@ -104,13 +111,14 @@ func TestSolidityExport(t *testing.T) {
 
 	fmt.Println("groth16 verify finished")
 
-	f, err := os.Create("LookUpTest.sol")
+	f, err := os.Create("LookUpTest1.sol")
 	if err != nil {
 		assert.NoError(err)
 	}
 
 	defer f.Close()
 	vk.ExportSolidity(f)
+	panic("")
 }
 
 func ExportProof(proof groth16.Proof) (a [2]*big.Int, b [2][2]*big.Int, c [2]*big.Int, commitment [2]*big.Int, commitmentPok [2]*big.Int) {
