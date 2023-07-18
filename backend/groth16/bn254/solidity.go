@@ -7,6 +7,7 @@ package groth16
 const solidityTemplate = `
 {{- $lenCommits := len .PublicAndCommitmentCommitted }}
 {{- $nbPublicVars := sub (len .G1.K) $lenCommits }}
+{{- $nbPublicInputs := sub $nbPublicVars 1 }}
 {{- $lenK := len .G1.K }}
 // SPDX-License-Identifier: AML
 //
@@ -247,12 +248,12 @@ contract Verifier {
         uint256[2] memory a,
         uint256[2][2] memory b,
         uint256[2] memory c,
-        {{ if (gt $lenCommits 0) }}
+        {{- if (gt $lenCommits 0) }}
         uint256[{{sub $nbPublicVars 1}}] calldata input,
         uint256[2][{{len .PublicAndCommitmentCommitted}}] calldata commitments
-        {{ else }}
+        {{- else }}
         uint256[{{sub $nbPublicVars 1}}] calldata input
-        {{ end }}
+        {{- end }}
     ) public view returns (bool r) {
 
         Proof memory proof;
@@ -308,14 +309,14 @@ contract Verifier {
         {{- if eq $nbPublicVars 1}}
             // no public input, vk_x == vk.K[0]
         {{- end}}
-        {{- range $i, $ki := .G1.K }}
-            {{- if gt $i 0 -}}
-                {{- $j := sub $i 1 }}
+        {{- range (seq 1 $nbPublicInputs) }}
+            {{- $i := . }}
+            {{- $j := sub $i 1 }}
+            {{- $ki := index $.G1.K $i }}
         mul_input[0] = uint256({{$ki.X.String}}); // vk.K[{{$i}}].X
         mul_input[1] = uint256({{$ki.Y.String}}); // vk.K[{{$i}}].Y
         mul_input[2] = input[{{$j}}];
         accumulate(mul_input, q, add_input, vk_x); // vk_x += vk.K[{{$i}}] * input[{{$j}}]
-            {{- end -}}
         {{- end }}
 
         for (uint256 i = 0; i < proof.Commitments.length; i++) {

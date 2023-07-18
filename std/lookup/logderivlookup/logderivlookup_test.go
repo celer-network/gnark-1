@@ -117,7 +117,8 @@ func TestSolidityExport(t *testing.T) {
 	}
 
 	defer f.Close()
-	vk.ExportSolidity(f)
+	err = vk.ExportSolidity(f)
+	assert.NoError(err)
 	panic("")
 }
 

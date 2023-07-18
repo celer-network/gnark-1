@@ -45,6 +45,7 @@ func Verify(proof *Proof, vk *VerifyingKey, publicWitness fr.Vector) error {
 	fmt.Printf("len(vk.G1.K) %d\n", len(vk.G1.K))
 	fmt.Printf("len(vk.PublicAndCommitmentCommitted) %d\n", len(vk.PublicAndCommitmentCommitted))
 	fmt.Printf("len(publicWitness) %d\n", len(publicWitness))
+	fmt.Printf("vk.G1.K %s\n", vk.G1.K[0].String())
 
 	if len(publicWitness) != nbPublicVars-1 {
 		return fmt.Errorf("invalid witness size, got %d, expected %d (public - ONE_WIRE)", len(publicWitness), len(vk.G1.K)-1)
@@ -140,6 +141,16 @@ func (vk *VerifyingKey) ExportSolidity(w io.Writer) error {
 	helpers := template.FuncMap{
 		"sub": func(a, b int) int {
 			return a - b
+		},
+		"seq": func(a, b int) ([]int, error) {
+			if a > b {
+				return nil, fmt.Errorf("seq a must less than b")
+			}
+			var arr []int
+			for i := a; i <= b; i++ {
+				arr = append(arr, i)
+			}
+			return arr, nil
 		},
 	}
 
