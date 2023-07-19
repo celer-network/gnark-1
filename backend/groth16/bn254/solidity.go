@@ -6,8 +6,6 @@ package groth16
 // this is an experimental feature and gnark solidity generator as not been thoroughly tested
 const solidityTemplate = `
 {{- $lenCommits := len .PublicAndCommitmentCommitted }}
-{{- $nbPublicVars := sub (len .G1.K) $lenCommits }}
-{{- $nbPublicInputs := sub $nbPublicVars 1 }}
 {{- $lenK := len .G1.K }}
 // SPDX-License-Identifier: AML
 //
@@ -31,6 +29,8 @@ const solidityTemplate = `
 // 2019 OKIMS
 
 pragma solidity ^0.8.0;
+
+import "hardhat/console.sol";
 
 library Pairing {
 
@@ -200,6 +200,7 @@ contract Verifier {
         Pairing.G2Point beta2;
         Pairing.G2Point gamma2;
         Pairing.G2Point delta2;
+        
         // []G1Point IC (K in gnark) appears directly in verifyProof
         
     }
@@ -249,10 +250,10 @@ contract Verifier {
         uint256[2][2] memory b,
         uint256[2] memory c,
         {{- if (gt $lenCommits 0) }}
-        uint256[{{sub $nbPublicVars 1}}] calldata input,
-        uint256[2][{{len .PublicAndCommitmentCommitted}}] calldata commitments
+        uint256[2][{{len .PublicAndCommitmentCommitted}}] calldata commitments,
+        uint256[{{sub $lenK 1}}] calldata input
         {{- else }}
-        uint256[{{sub $nbPublicVars 1}}] calldata input
+        uint256[{{sub $lenK 1}}] calldata input
         {{- end }}
     ) public view returns (bool r) {
 
@@ -306,17 +307,17 @@ contract Verifier {
         vk_x.X = uint256({{$k0.X.String}}); // vk.K[0].X
         vk_x.Y = uint256({{$k0.Y.String}}); // vk.K[0].Y
 
-        {{- if eq $nbPublicVars 1}}
+        {{- if eq $lenK 1}}
             // no public input, vk_x == vk.K[0]
         {{- end}}
-        {{- range (seq 1 $nbPublicInputs) }}
-            {{- $i := . }}
-            {{- $j := sub $i 1 }}
-            {{- $ki := index $.G1.K $i }}
+        {{- range $i, $ki := .G1.K }}
+            {{- if gt $i 0 -}}
+                {{- $j := sub $i 1 }}
         mul_input[0] = uint256({{$ki.X.String}}); // vk.K[{{$i}}].X
         mul_input[1] = uint256({{$ki.Y.String}}); // vk.K[{{$i}}].Y
         mul_input[2] = input[{{$j}}];
         accumulate(mul_input, q, add_input, vk_x); // vk_x += vk.K[{{$i}}] * input[{{$j}}]
+            {{- end }}
         {{- end }}
 
         for (uint256 i = 0; i < proof.Commitments.length; i++) {
