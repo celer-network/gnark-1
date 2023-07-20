@@ -19,6 +19,7 @@ require (
 )
 
 require (
+	github.com/celer-network/goutils v0.1.60 // indirect
 	github.com/davecgh/go-spew v1.1.1 // indirect
 	github.com/mattn/go-colorable v0.1.13 // indirect
 	github.com/mattn/go-isatty v0.0.16 // indirect
