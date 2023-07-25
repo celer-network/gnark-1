@@ -30,8 +30,6 @@ const solidityTemplate = `
 
 pragma solidity ^0.8.0;
 
-import "hardhat/console.sol";
-
 library Pairing {
 
     uint256 constant PRIME_Q = 21888242871839275222246405745257275088696311157297823662689037894645226208583;
