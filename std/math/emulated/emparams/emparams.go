@@ -31,6 +31,12 @@ func (sixLimbPrimeField) NbLimbs() uint     { return 6 }
 func (sixLimbPrimeField) BitsPerLimb() uint { return 64 }
 func (sixLimbPrimeField) IsPrime() bool     { return true }
 
+type twelveLimbPrimeField struct{}
+
+func (twelveLimbPrimeField) NbLimbs() uint     { return 12 }
+func (twelveLimbPrimeField) BitsPerLimb() uint { return 64 }
+func (twelveLimbPrimeField) IsPrime() bool     { return true }
+
 // Goldilocks provides type parametrization for field emulation:
 //   - limbs: 1
 //   - limb width: 64 bits
@@ -199,3 +205,11 @@ func (P384Fp) Modulus() *big.Int { return elliptic.P384().Params().P }
 type P384Fr struct{ sixLimbPrimeField }
 
 func (P384Fr) Modulus() *big.Int { return elliptic.P384().Params().N }
+
+type BW6761Fr struct{ sixLimbPrimeField }
+
+func (fp BW6761Fr) Modulus() *big.Int { return ecc.BW6_761.ScalarField() }
+
+type BW6761Fp struct{ twelveLimbPrimeField }
+
+func (fp BW6761Fp) Modulus() *big.Int { return ecc.BW6_761.BaseField() }
