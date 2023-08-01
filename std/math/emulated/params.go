@@ -31,6 +31,7 @@ type (
 	BN254Fp     = emparams.BN254Fp
 	BN254Fr     = emparams.BN254Fr
 	BLS12377Fp  = emparams.BLS12377Fp
+	BLS12377Fr  = emparams.BLS12377Fr
 	BLS12381Fp  = emparams.BLS12381Fp
 	BLS12381Fr  = emparams.BLS12381Fr
 	P256Fp      = emparams.P256Fp

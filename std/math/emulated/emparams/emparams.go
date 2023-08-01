@@ -122,6 +122,10 @@ type BLS12377Fp struct{ sixLimbPrimeField }
 
 func (fp BLS12377Fp) Modulus() *big.Int { return ecc.BLS12_377.BaseField() }
 
+type BLS12377Fr struct{ fourLimbPrimeField }
+
+func (fr BLS12377Fr) Modulus() *big.Int { return ecc.BLS12_377.ScalarField() }
+
 // BLS12381Fp provides type parametrization for field emulation:
 //   - limbs: 6
 //   - limb width: 64 bits
